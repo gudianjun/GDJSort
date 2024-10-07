@@ -8,7 +8,10 @@ class CsvGenerator
 {
     static void Main()
     {
-        string fileName = "C:\\GitHub\\large_data.csv";
+        string fileName = "C:\\GitHub\\large_data2.csv";
+        
+        // CrateLageFile(fileName);
+
         string tempDirectory = "C:\\GitHub\\temp";
         string sortedFileName = "C:\\GitHub\\sorted_large_data.csv";
         Stopwatch stopwatch = new Stopwatch(); // 创建一个 Stopwatch 对象
@@ -37,7 +40,7 @@ class CsvGenerator
             File.Delete(tempFile);
         } 
 
-        //CrateLageFile(fileName);
+        CrateLageFile(fileName);
         // StartReadFile1(fileName);
         // StartReadFile2(fileName);
     }
@@ -102,7 +105,7 @@ class CsvGenerator
     }
     static async Task<List<string>> SplitAndSortFile(string fileName, string tempDirectory)
     {
-        const int chunkSize = 50 * 1024 * 1024; // 50MB
+        const int chunkSize = 10 * 1024 * 1024; // 50MB
         ConcurrentBag<string> tempFiles = new ConcurrentBag<string>();
         int fileIndex = 0;
         List<Task> tasks = new List<Task>();
@@ -296,9 +299,8 @@ class CsvGenerator
         Console.WriteLine($"排序完毕2！执行时长：{executionTime.TotalMilliseconds} 毫秒");
     }
     static void CrateLageFile(string filePath)
-    {
-        
-        long targetSize = 1L * 1024 * 1024 * 1024; // 1GB
+    { 
+        long targetSize = 1L * 100 * 1024 * 1024; // 1GB
         var columnTypes = new Func<Random, string>[30];
 
         Random random = new Random();
