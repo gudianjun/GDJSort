@@ -10,7 +10,7 @@ class CsvGenerator
     {
         string fileName = "C:\\GitHub\\large_data2.csv";
         
-        // CrateLageFile(fileName);
+       //  CrateLageFile(fileName);
 
         string tempDirectory = "C:\\GitHub\\temp";
         string sortedFileName = "C:\\GitHub\\sorted_large_data.csv";
@@ -40,7 +40,7 @@ class CsvGenerator
             File.Delete(tempFile);
         } 
 
-        CrateLageFile(fileName);
+        // CrateLageFile(fileName);
         // StartReadFile1(fileName);
         // StartReadFile2(fileName);
     }
