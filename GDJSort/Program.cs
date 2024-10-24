@@ -8,7 +8,7 @@ class CsvGenerator
 {
     static void Main()
     {
-        string fileName = "C:\\GitHub\\large_data2.csv";
+        string fileName = "C:\\GitHub\\SortOutTestCsv.csv";
         
        //  CrateLageFile(fileName);
 
@@ -105,7 +105,7 @@ class CsvGenerator
     }
     static async Task<List<string>> SplitAndSortFile(string fileName, string tempDirectory)
     {
-        const int chunkSize = 10 * 1024 * 1024; // 50MB
+        const int chunkSize = 100 * 1024 * 1024; // 50MB
         ConcurrentBag<string> tempFiles = new ConcurrentBag<string>();
         int fileIndex = 0;
         List<Task> tasks = new List<Task>();
@@ -373,6 +373,7 @@ class CsvGenerator
 }
 class CsvLineComparer : IComparer<string>
 {
+    // 2,3,4
     public int Compare(string? x, string? y)
     {
         if (x == null || y == null)
@@ -382,10 +383,14 @@ class CsvLineComparer : IComparer<string>
         var yFields = y.Split(',');
 
         // 假设我们要根据第一个字段和第二个字段进行排序
-        int result = string.Compare(xFields[0], yFields[0]);
+        int result = string.Compare(xFields[2], yFields[2]);
         if (result == 0)
         {
-            result = string.Compare(xFields[1], yFields[1]);
+            result = string.Compare(xFields[3], yFields[3]);
+            if (result == 0)
+            {
+                result = string.Compare(xFields[4], yFields[4]);
+            }
         }
 
         return result;
