@@ -8,9 +8,9 @@ class CsvGenerator
 {
     static void Main()
     {
-        string fileName = "C:\\GitHub\\large_data2.csv";
-        
-       //  CrateLageFile(fileName);
+        string fileName = "C:\\GitHub\\SortOutTestCsv.csv";
+
+        //  CrateLageFile(fileName);
 
         string tempDirectory = "C:\\GitHub\\temp";
         string sortedFileName = "C:\\GitHub\\sorted_large_data.csv";
@@ -19,10 +19,10 @@ class CsvGenerator
         // 创建临时目录
         if (!Directory.Exists(tempDirectory))
             Directory.CreateDirectory(tempDirectory);
-        if(File.Exists(sortedFileName))
+        if (File.Exists(sortedFileName))
             File.Delete(sortedFileName);
         // 分段读取、排序并生成临时文件
-        List<string> tempFiles =   SplitAndSortFile(fileName, tempDirectory).GetAwaiter().GetResult();
+        List<string> tempFiles = SplitAndSortFile(fileName, tempDirectory).GetAwaiter().GetResult();
         //List<string> tempFiles = SplitAndSortFile2(fileName, tempDirectory) ;
         stopwatch.Stop(); // 停止计时
         TimeSpan executionTime = stopwatch.Elapsed; // 获取执行时间 
@@ -35,21 +35,21 @@ class CsvGenerator
         Console.WriteLine($"排MergeSortedFiles：{executionTime.TotalMilliseconds} 毫秒");
 
         // 删除临时目录
-        foreach(var tempFile in tempFiles)
+        foreach (var tempFile in tempFiles)
         {
             File.Delete(tempFile);
-        } 
+        }
 
         // CrateLageFile(fileName);
         // StartReadFile1(fileName);
         // StartReadFile2(fileName);
     }
 
-    static List<string>  SplitAndSortFile2(string fileName, string tempDirectory)
+    static List<string> SplitAndSortFile2(string fileName, string tempDirectory)
     {
         const int chunkSize = 100 * 1024 * 1024; // 50MB
         ConcurrentBag<string> tempFiles = new ConcurrentBag<string>();
-        int fileIndex = 0; 
+        int fileIndex = 0;
 
         using (FileStream fs = new FileStream(fileName, FileMode.Open, FileAccess.Read))
         using (BufferedStream bs = new BufferedStream(fs))
@@ -76,36 +76,124 @@ class CsvGenerator
                 leftover.Append(chunk.Substring(lastNewLineIndex + 1));
 
                 string[] lines = completeChunk.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
- 
-                    // 对块进行排序
-                    Array.Sort(lines, new CsvLineComparer());
 
-                    // 写入临时文件
-                    string tempFileName = Path.Combine(tempDirectory, $"temp_{Interlocked.Increment(ref fileIndex)}.csv");
-                    File.WriteAllLines(tempFileName, lines, Encoding.UTF8);
-                    tempFiles.Add(tempFileName);
-                 
+                // 对块进行排序
+                Array.Sort(lines, new CsvLineComparer());
+
+                // 写入临时文件
+                string tempFileName = Path.Combine(tempDirectory, $"temp_{Interlocked.Increment(ref fileIndex)}.csv");
+                File.WriteAllLines(tempFileName, lines, Encoding.UTF8);
+                tempFiles.Add(tempFileName);
+
             }
 
             // 处理最后剩余的不完整行
             if (leftover.Length > 0)
             {
-                 
-                    string[] lines = leftover.ToString().Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                    Array.Sort(lines, new CsvLineComparer());
-                    string tempFileName = Path.Combine(tempDirectory, $"temp_{Interlocked.Increment(ref fileIndex)}.csv");
-                    File.WriteAllLines(tempFileName, lines, Encoding.UTF8);
-                    tempFiles.Add(tempFileName);
-                
+
+                string[] lines = leftover.ToString().Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                Array.Sort(lines, new CsvLineComparer());
+                string tempFileName = Path.Combine(tempDirectory, $"temp_{Interlocked.Increment(ref fileIndex)}.csv");
+                File.WriteAllLines(tempFileName, lines, Encoding.UTF8);
+                tempFiles.Add(tempFileName);
+
             }
         }
 
-        
+
+        return tempFiles.ToList();
+    }
+    static List<string> SplitAndSortFileTongbu(string fileName, string tempDirectory)
+    {
+        const int chunkSize = 50 * 1024 * 1024; // 50MB
+        ConcurrentBag<string> tempFiles = new ConcurrentBag<string>();
+        int fileIndex = 0;
+        List<Task> tasks = new List<Task>();
+
+        using (FileStream fs = new FileStream(fileName, FileMode.Open, FileAccess.Read))
+        using (BufferedStream bs = new BufferedStream(fs))
+        using (StreamReader sr = new StreamReader(bs, Encoding.UTF8))
+        {
+            char[] buffer = new char[chunkSize];
+            int bytesRead;
+            StringBuilder leftover = new StringBuilder();
+
+            while ((bytesRead = sr.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                string chunk = leftover.Append(buffer, 0, bytesRead).ToString();
+                int lastNewLineIndex = chunk.LastIndexOf('\n');
+
+                if (lastNewLineIndex == -1)
+                {
+                    // 如果没有找到换行符，说明整个块都是不完整的行
+                    continue;
+                }
+
+                // 分割完整的行和不完整的行
+                string completeChunk = chunk.Substring(0, lastNewLineIndex + 1);
+                leftover.Clear();
+                leftover.Append(chunk.Substring(lastNewLineIndex + 1));
+
+                string[] lines = completeChunk.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+
+                // 对块进行排序
+                // Array.Sort(lines, new CsvLineComparer());
+                var csvLines = lines.Select(line => new CsvLine(line)).ToArray();
+                Array.Sort(csvLines, (x, y) =>
+                {
+                    int result = string.Compare(x.Fields[2], y.Fields[2]);
+                    if (result == 0)
+                    {
+                        result = string.Compare(x.Fields[3], y.Fields[3]);
+                        if (result == 0)
+                        {
+                            result = string.Compare(x.Fields[4], y.Fields[4]);
+                        }
+                    }
+                    return result;
+                });
+                // 写入临时文件
+                string tempFileName = Path.Combine(tempDirectory, $"temp_{Interlocked.Increment(ref fileIndex)}.csv");
+                File.WriteAllLines(tempFileName, csvLines.Select(cl => cl.OriginalLine), Encoding.UTF8);
+                tempFiles.Add(tempFileName);
+
+            }
+
+            // 处理最后剩余的不完整行
+            if (leftover.Length > 0)
+            {
+
+                string[] lines = leftover.ToString().Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                // Array.Sort(lines, new CsvLineComparer());
+                // 预处理数据
+                var csvLines = lines.Select(line => new CsvLine(line)).ToArray();
+                Array.Sort(csvLines, (x, y) =>
+                {
+                    int result = string.Compare(x.Fields[2], y.Fields[2]);
+                    if (result == 0)
+                    {
+                        result = string.Compare(x.Fields[3], y.Fields[3]);
+                        if (result == 0)
+                        {
+                            result = string.Compare(x.Fields[4], y.Fields[4]);
+                        }
+                    }
+                    return result;
+                });
+                string tempFileName = Path.Combine(tempDirectory, $"temp_{Interlocked.Increment(ref fileIndex)}.csv");
+                File.WriteAllLines(tempFileName, csvLines.Select(cl => cl.OriginalLine), Encoding.UTF8);
+                tempFiles.Add(tempFileName);
+
+            }
+        }
+
+
         return tempFiles.ToList();
     }
     static async Task<List<string>> SplitAndSortFile(string fileName, string tempDirectory)
     {
-        const int chunkSize = 10 * 1024 * 1024; // 50MB
+        const int chunkSize = 20 * 1024 * 1024; // 50MB
         ConcurrentBag<string> tempFiles = new ConcurrentBag<string>();
         int fileIndex = 0;
         List<Task> tasks = new List<Task>();
@@ -139,11 +227,24 @@ class CsvGenerator
                 var task = Task.Run(() =>
                 {
                     // 对块进行排序
-                    Array.Sort(lines, new CsvLineComparer());
-
+                    // Array.Sort(lines, new CsvLineComparer());
+                    var csvLines = lines.Select(line => new CsvLine(line)).ToArray();
+                    Array.Sort(csvLines, (x, y) =>
+                    {
+                        int result = string.Compare(x.Fields[2], y.Fields[2]);
+                        if (result == 0)
+                        {
+                            result = string.Compare(x.Fields[3], y.Fields[3]);
+                            if (result == 0)
+                            {
+                                result = string.Compare(x.Fields[4], y.Fields[4]);
+                            }
+                        }
+                        return result;
+                    });
                     // 写入临时文件
                     string tempFileName = Path.Combine(tempDirectory, $"temp_{Interlocked.Increment(ref fileIndex)}.csv");
-                    File.WriteAllLines(tempFileName, lines, Encoding.UTF8);
+                    File.WriteAllLines(tempFileName, csvLines.Select(cl => cl.OriginalLine), Encoding.UTF8);
                     tempFiles.Add(tempFileName);
                 });
                 tasks.Add(task);
@@ -155,9 +256,24 @@ class CsvGenerator
                 var task = Task.Run(() =>
                 {
                     string[] lines = leftover.ToString().Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                    Array.Sort(lines, new CsvLineComparer());
+                    // Array.Sort(lines, new CsvLineComparer());
+                    // 预处理数据
+                    var csvLines = lines.Select(line => new CsvLine(line)).ToArray();
+                    Array.Sort(csvLines, (x, y) =>
+                    {
+                        int result = string.Compare(x.Fields[2], y.Fields[2]);
+                        if (result == 0)
+                        {
+                            result = string.Compare(x.Fields[3], y.Fields[3]);
+                            if (result == 0)
+                            {
+                                result = string.Compare(x.Fields[4], y.Fields[4]);
+                            }
+                        }
+                        return result;
+                    });
                     string tempFileName = Path.Combine(tempDirectory, $"temp_{Interlocked.Increment(ref fileIndex)}.csv");
-                    File.WriteAllLines(tempFileName, lines, Encoding.UTF8);
+                    File.WriteAllLines(tempFileName, csvLines.Select(cl => cl.OriginalLine), Encoding.UTF8);
                     tempFiles.Add(tempFileName);
                 });
                 tasks.Add(task);
@@ -213,7 +329,7 @@ class CsvGenerator
     static void MergeSortedFiles(List<string> sortedFiles, string outputFileName)
     {
         var readers = sortedFiles.Select(file => new StreamReader(file, Encoding.UTF8)).ToList();
-    
+
         var priorityQueue = new SortedDictionary<string, int>();
 
         using (var writer = new StreamWriter(outputFileName, false, Encoding.UTF8))
@@ -224,9 +340,9 @@ class CsvGenerator
                 if (!readers[i].EndOfStream)
                 {
                     string? line = readers[i].ReadLine();
-                    if(!string.IsNullOrEmpty(line))
+                    if (!string.IsNullOrEmpty(line))
                     {
-                        priorityQueue.Add(line, i); 
+                        priorityQueue.Add(line, i);
                     }
                 }
             }
@@ -246,7 +362,7 @@ class CsvGenerator
                     if (!string.IsNullOrEmpty(line))
                     {
                         priorityQueue.Add(line, readerIndex);
-                    } 
+                    }
                 }
             }
         }
@@ -264,7 +380,7 @@ class CsvGenerator
         // 用第一列排序
         using (FileStream fs = new FileStream(fileName, FileMode.Open, FileAccess.Read))
         using (BufferedStream bs = new BufferedStream(fs))
-        using (StreamReader sr = new StreamReader(bs,  Encoding.UTF8))
+        using (StreamReader sr = new StreamReader(bs, Encoding.UTF8))
         {
             string? line = null;
             while ((line = sr.ReadLine()) != null)
@@ -299,7 +415,7 @@ class CsvGenerator
         Console.WriteLine($"排序完毕2！执行时长：{executionTime.TotalMilliseconds} 毫秒");
     }
     static void CrateLageFile(string filePath)
-    { 
+    {
         long targetSize = 1L * 100 * 1024 * 1024; // 1GB
         var columnTypes = new Func<Random, string>[30];
 
@@ -389,5 +505,16 @@ class CsvLineComparer : IComparer<string>
         }
 
         return result;
+    }
+}
+class CsvLine
+{
+    public string OriginalLine { get; }
+    public string[] Fields { get; }
+
+    public CsvLine(string line)
+    {
+        OriginalLine = line;
+        Fields = line.Split(',');
     }
 }
